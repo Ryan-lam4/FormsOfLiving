@@ -29,25 +29,22 @@
       width: auto;
       flex: 0 0 auto;
       object-fit: contain;
-      padding: 0;
       margin: 0;
-      pointer-events: none;
-      -webkit-user-drag: none;
+      padding: 0;
       display: block;
+      -webkit-user-drag: none;
       transition: filter 0.6s ease, opacity 0.6s ease;
     }
 
-    /* When a slide is selected, dim all others */
     body.has-selection #track img {
-      filter: brightness(0.35) grayscale(0.4);
-      opacity: 0.5;
+      filter: brightness(0.3) grayscale(0.5);
+      opacity: 0.4;
     }
     body.has-selection #track img.selected {
-      filter: brightness(1.15) saturate(0.9);
+      filter: brightness(1.2) saturate(0.9);
       opacity: 1;
     }
 
-    /* Overlay text */
     #overlay {
       position: fixed;
       inset: 0;
@@ -62,9 +59,7 @@
       padding: 0 8vw;
       color: #f4f4f0;
     }
-    body.has-selection #overlay {
-      opacity: 1;
-    }
+    body.has-selection #overlay { opacity: 1; }
 
     #overlay .title {
       font-size: clamp(28px, 5vw, 64px);
@@ -74,7 +69,6 @@
       line-height: 1.15;
       margin-bottom: 1.2em;
     }
-
     #overlay .caption {
       font-size: clamp(12px, 1.2vw, 16px);
       font-weight: 300;
@@ -84,7 +78,6 @@
       max-width: 640px;
       line-height: 2;
     }
-
     #overlay .rule {
       width: 40px;
       height: 1px;
@@ -93,7 +86,6 @@
       margin: 1.6em 0;
     }
 
-    /* Small close hint */
     #hint {
       position: fixed;
       bottom: 24px;
@@ -107,9 +99,7 @@
       transition: opacity 0.6s ease;
       pointer-events: none;
     }
-    body.has-selection #hint {
-      opacity: 0.45;
-    }
+    body.has-selection #hint { opacity: 0.45; }
   </style>
 </head>
 <body>
@@ -124,8 +114,9 @@
   <div id="hint">Click anywhere to return</div>
 
   <script>
+    console.log('[slideshow] script starting');
+
     // ==== EDIT THIS LIST ====
-    // Each entry: { src, title, caption }
     const slides = [
       { src: "images/st1.png",  title: "Form I",   caption: "Emergent structure, grown not built" },
       { src: "images/st2.png",  title: "Form II",  caption: "Material as a record of force" },
@@ -154,7 +145,7 @@
     const ovTitle = document.getElementById('ovTitle');
     const ovCaption = document.getElementById('ovCaption');
 
-    let selectedIndex = -1;   // -1 = nothing selected
+    let selectedIndex = -1;
     let selectedEl = null;
 
     const buildImages = () => {
@@ -163,13 +154,29 @@
         slides.forEach((slide, i) => {
           const img = document.createElement('img');
           img.src = slide.src;
-          img.alt = slide.title;
+          img.alt = '';
           img.dataset.index = i;
+          img.dataset.copy = copy;
           track.appendChild(img);
         });
       }
+      console.log('[slideshow] built', track.children.length, 'image elements');
     };
     buildImages();
+
+    // Attach click handler to every image
+    function attachClickHandlers() {
+      Array.from(track.children).forEach(img => {
+        img.addEventListener('click', (e) => {
+          console.log('[slideshow] img clicked, index =', img.dataset.index);
+          e.stopPropagation();
+          if (selectedIndex === -1) {
+            selectSlide(img);
+          }
+        });
+      });
+    }
+    attachClickHandlers();
 
     let offset = 0;
     let boost = 0;
@@ -185,6 +192,7 @@
       for (let i = 0; i < slides.length; i++) {
         singleWidth += kids[i].getBoundingClientRect().width;
       }
+      console.log('[slideshow] measured singleWidth =', singleWidth);
     }
 
     window.addEventListener('load', () => {
@@ -194,8 +202,7 @@
     window.addEventListener('resize', measure);
 
     function tick() {
-      // Freeze completely if a slide is selected
-      if (!holdPaused && selectedIndex === -1) {
+      if (!holdPaused && selectedIndex === -1 && !dragging) {
         const speed = baseSpeed + boost;
         offset -= speed;
         boost *= friction;
@@ -211,14 +218,8 @@
       requestAnimationFrame(tick);
     }
 
-    // ==== Selection ====
     function selectSlide(imgEl) {
-      // If already selected, deselect
-      if (selectedEl === imgEl) {
-        deselect();
-        return;
-      }
-
+      console.log('[slideshow] selectSlide called');
       if (selectedEl) selectedEl.classList.remove('selected');
       selectedEl = imgEl;
       selectedEl.classList.add('selected');
@@ -229,13 +230,12 @@
       ovTitle.textContent = slides[i].title;
       ovCaption.textContent = slides[i].caption;
 
-      // Center the selected image on screen
       centerOn(imgEl);
-
       document.body.classList.add('has-selection');
     }
 
     function deselect() {
+      console.log('[slideshow] deselect called');
       if (selectedEl) selectedEl.classList.remove('selected');
       selectedEl = null;
       selectedIndex = -1;
@@ -247,25 +247,24 @@
       const centerX = rect.left + rect.width / 2;
       const viewportCenter = window.innerWidth / 2;
       const delta = viewportCenter - centerX;
-      // Animate smoothly by tweening offset
       const start = offset;
       const end = offset + delta;
       const startTime = performance.now();
       const duration = 700;
       function step(now) {
         const t = Math.min(1, (now - startTime) / duration);
-        const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
+        const eased = 1 - Math.pow(1 - t, 3);
         offset = start + (end - start) * eased;
         if (t < 1) requestAnimationFrame(step);
       }
       requestAnimationFrame(step);
     }
 
-    // ==== Pointer handling ====
+    // ==== Drag handling (separate from clicks) ====
     let downX = 0, downY = 0, downTime = 0, moved = false;
 
-    function onDown(e) {
-      if (selectedIndex !== -1) return; // ignore drags while selected
+    document.addEventListener('pointerdown', (e) => {
+      if (selectedIndex !== -1) return;
       dragging = true;
       moved = false;
       lastX = e.clientX;
@@ -277,65 +276,47 @@
       holdTimer = setTimeout(() => {
         if (dragging && !moved) holdPaused = true;
       }, 250);
-    }
+    });
 
-    function onMove(e) {
-      if (!dragging) return;
+    document.addEventListener('pointermove', (e) => {
+      if (!dragging || selectedIndex !== -1) return;
       const dx = e.clientX - lastX;
       lastX = e.clientX;
 
-      if (Math.abs(e.clientX - downX) > 3 || Math.abs(e.clientY - downY) > 3) {
+      if (Math.abs(e.clientX - downX) > 6 || Math.abs(e.clientY - downY) > 6) {
         moved = true;
         clearTimeout(holdTimer);
         holdPaused = false;
       }
 
       boost -= dx * dragMultiplier;
-    }
+    });
 
-    function onUp(e) {
-      if (dragging) {
-        dragging = false;
-        clearTimeout(holdTimer);
-        holdPaused = false;
-
-        const dt = performance.now() - downTime;
-        // Treat as a click if the pointer barely moved and was quick
-        if (!moved && dt < 400) {
-          handleClick(e.clientX, e.clientY);
-        }
-      }
-    }
-
-    function handleClick(x, y) {
-      // If something is selected, clicking anywhere deselects
+    document.addEventListener('pointerup', (e) => {
       if (selectedIndex !== -1) {
-        deselect();
+        // If nothing is selected and it was a quick tap, deselect
+        const dt = performance.now() - downTime;
+        if (dt < 400 && Math.abs(e.clientX - downX) < 6 && Math.abs(e.clientY - downY) < 6) {
+          deselect();
+        }
         return;
       }
-      // Otherwise, hit-test the image under the pointer
-      // Temporarily allow pointer events to find the element
-      const els = document.elementsFromPoint(x, y);
-      const img = els.find(el => el.tagName === 'IMG' && el.dataset.index !== undefined);
-      if (img) selectSlide(img);
-    }
-
-    const surface = document.body;
-    surface.addEventListener('pointerdown', onDown);
-    surface.addEventListener('pointermove', onMove);
-    surface.addEventListener('pointerup', onUp);
-    surface.addEventListener('pointercancel', () => { dragging = false; clearTimeout(holdTimer); holdPaused = false; });
-    surface.addEventListener('contextmenu', e => e.preventDefault());
-    surface.addEventListener('dragstart', e => e.preventDefault());
-
-    // Need pointer events on the track images for click detection via elementsFromPoint,
-    // but we set pointer-events: none on imgs earlier so hover doesn't fight the drag.
-    // elementsFromPoint still returns them regardless of pointer-events, so we're fine.
-
-    // Escape key to deselect
-    document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') deselect();
+      dragging = false;
+      clearTimeout(holdTimer);
+      holdPaused = false;
     });
+
+    document.addEventListener('pointercancel', () => {
+      dragging = false;
+      clearTimeout(holdTimer);
+      holdPaused = false;
+    });
+
+    document.addEventListener('contextmenu', e => e.preventDefault());
+    document.addEventListener('dragstart', e => e.preventDefault());
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') deselect(); });
+
+    console.log('[slideshow] setup complete');
   </script>
 </body>
 </html>
