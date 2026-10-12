@@ -3,18 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Image Slideshow</title>
+  <title>Forms of Living</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body {
       height: 100%;
       overflow: hidden;
       background: #000;
-      font-family: system-ui, sans-serif;
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
       user-select: none;
       -webkit-user-select: none;
       touch-action: none;
     }
+
     #track {
       display: flex;
       flex-direction: row;
@@ -22,41 +23,126 @@
       align-items: center;
       will-change: transform;
     }
+
     #track img {
-      height: 60vh;      /* controls how tall the images are in the void */
+      height: 60vh;
       width: auto;
       flex: 0 0 auto;
       object-fit: contain;
-      padding: 0;        /* no gap between images */
+      padding: 0;
       margin: 0;
       pointer-events: none;
       -webkit-user-drag: none;
       display: block;
+      transition: filter 0.6s ease, opacity 0.6s ease;
+    }
+
+    /* When a slide is selected, dim all others */
+    body.has-selection #track img {
+      filter: brightness(0.35) grayscale(0.4);
+      opacity: 0.5;
+    }
+    body.has-selection #track img.selected {
+      filter: brightness(1.15) saturate(0.9);
+      opacity: 1;
+    }
+
+    /* Overlay text */
+    #overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.8s ease;
+      text-align: center;
+      padding: 0 8vw;
+      color: #f4f4f0;
+    }
+    body.has-selection #overlay {
+      opacity: 1;
+    }
+
+    #overlay .title {
+      font-size: clamp(28px, 5vw, 64px);
+      font-weight: 200;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      line-height: 1.15;
+      margin-bottom: 1.2em;
+    }
+
+    #overlay .caption {
+      font-size: clamp(12px, 1.2vw, 16px);
+      font-weight: 300;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      opacity: 0.75;
+      max-width: 640px;
+      line-height: 2;
+    }
+
+    #overlay .rule {
+      width: 40px;
+      height: 1px;
+      background: #f4f4f0;
+      opacity: 0.5;
+      margin: 1.6em 0;
+    }
+
+    /* Small close hint */
+    #hint {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #f4f4f0;
+      font-size: 11px;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      opacity: 0;
+      transition: opacity 0.6s ease;
+      pointer-events: none;
+    }
+    body.has-selection #hint {
+      opacity: 0.45;
     }
   </style>
 </head>
 <body>
   <div id="track"></div>
 
+  <div id="overlay">
+    <div class="title" id="ovTitle"></div>
+    <div class="rule"></div>
+    <div class="caption" id="ovCaption"></div>
+  </div>
+
+  <div id="hint">Click anywhere to return</div>
+
   <script>
     // ==== EDIT THIS LIST ====
-    const images = [
-      "images/st1.png",
-      "images/st2.png",
-      "images/st3.png",
-      "images/st4.png",
-      "images/st5.png",
-      "images/st6.png",
-      "images/st7.png",
-      "images/st8.png",
-      "images/st9.png",
-      "images/st10.png",
-      "images/st11.png",
-      "images/st12.png",
-      "images/st13.png",
-      "images/st14.png",
-      "images/st15.png",
-      "images/st16.png",
+    // Each entry: { src, title, caption }
+    const slides = [
+      { src: "images/st1.png",  title: "Form I",   caption: "Emergent structure, grown not built" },
+      { src: "images/st2.png",  title: "Form II",  caption: "Material as a record of force" },
+      { src: "images/st3.png",  title: "Form III", caption: "Between the organic and the computed" },
+      { src: "images/st4.png",  title: "Form IV",  caption: "Every boundary is a negotiation" },
+      { src: "images/st5.png",  title: "Form V",   caption: "Shape follows environment" },
+      { src: "images/st6.png",  title: "Form VI",  caption: "Growth as a design parameter" },
+      { src: "images/st7.png",  title: "Form VII", caption: "The space between things" },
+      { src: "images/st8.png",  title: "Form VIII",caption: "Structure without hierarchy" },
+      { src: "images/st9.png",  title: "Form IX",  caption: "Variation within a rule" },
+      { src: "images/st10.png", title: "Form X",   caption: "Surface as interface" },
+      { src: "images/st11.png", title: "Form XI",  caption: "Material intelligence" },
+      { src: "images/st12.png", title: "Form XII", caption: "The architecture of a moment" },
+      { src: "images/st13.png", title: "Form XIII",caption: "Bodies in dialogue" },
+      { src: "images/st14.png", title: "Form XIV", caption: "Softness as strategy" },
+      { src: "images/st15.png", title: "Form XV",  caption: "Continuous variation" },
+      { src: "images/st16.png", title: "Form XVI", caption: "Living systems, made visible" },
     ];
     // ========================
 
@@ -65,14 +151,20 @@
     const friction = 0.95;
 
     const track = document.getElementById('track');
+    const ovTitle = document.getElementById('ovTitle');
+    const ovCaption = document.getElementById('ovCaption');
+
+    let selectedIndex = -1;   // -1 = nothing selected
+    let selectedEl = null;
 
     const buildImages = () => {
       track.innerHTML = '';
       for (let copy = 0; copy < 2; copy++) {
-        images.forEach(src => {
+        slides.forEach((slide, i) => {
           const img = document.createElement('img');
-          img.src = src;
-          img.alt = '';
+          img.src = slide.src;
+          img.alt = slide.title;
+          img.dataset.index = i;
           track.appendChild(img);
         });
       }
@@ -90,7 +182,7 @@
     function measure() {
       const kids = track.children;
       singleWidth = 0;
-      for (let i = 0; i < images.length; i++) {
+      for (let i = 0; i < slides.length; i++) {
         singleWidth += kids[i].getBoundingClientRect().width;
       }
     }
@@ -102,7 +194,8 @@
     window.addEventListener('resize', measure);
 
     function tick() {
-      if (!holdPaused) {
+      // Freeze completely if a slide is selected
+      if (!holdPaused && selectedIndex === -1) {
         const speed = baseSpeed + boost;
         offset -= speed;
         boost *= friction;
@@ -118,12 +211,71 @@
       requestAnimationFrame(tick);
     }
 
+    // ==== Selection ====
+    function selectSlide(imgEl) {
+      // If already selected, deselect
+      if (selectedEl === imgEl) {
+        deselect();
+        return;
+      }
+
+      if (selectedEl) selectedEl.classList.remove('selected');
+      selectedEl = imgEl;
+      selectedEl.classList.add('selected');
+
+      const i = parseInt(imgEl.dataset.index, 10);
+      selectedIndex = i;
+
+      ovTitle.textContent = slides[i].title;
+      ovCaption.textContent = slides[i].caption;
+
+      // Center the selected image on screen
+      centerOn(imgEl);
+
+      document.body.classList.add('has-selection');
+    }
+
+    function deselect() {
+      if (selectedEl) selectedEl.classList.remove('selected');
+      selectedEl = null;
+      selectedIndex = -1;
+      document.body.classList.remove('has-selection');
+    }
+
+    function centerOn(imgEl) {
+      const rect = imgEl.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const viewportCenter = window.innerWidth / 2;
+      const delta = viewportCenter - centerX;
+      // Animate smoothly by tweening offset
+      const start = offset;
+      const end = offset + delta;
+      const startTime = performance.now();
+      const duration = 700;
+      function step(now) {
+        const t = Math.min(1, (now - startTime) / duration);
+        const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
+        offset = start + (end - start) * eased;
+        if (t < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+
+    // ==== Pointer handling ====
+    let downX = 0, downY = 0, downTime = 0, moved = false;
+
     function onDown(e) {
+      if (selectedIndex !== -1) return; // ignore drags while selected
       dragging = true;
+      moved = false;
       lastX = e.clientX;
+      downX = e.clientX;
+      downY = e.clientY;
+      downTime = performance.now();
+
       clearTimeout(holdTimer);
       holdTimer = setTimeout(() => {
-        if (dragging) holdPaused = true;
+        if (dragging && !moved) holdPaused = true;
       }, 250);
     }
 
@@ -132,7 +284,8 @@
       const dx = e.clientX - lastX;
       lastX = e.clientX;
 
-      if (Math.abs(dx) > 3) {
+      if (Math.abs(e.clientX - downX) > 3 || Math.abs(e.clientY - downY) > 3) {
+        moved = true;
         clearTimeout(holdTimer);
         holdPaused = false;
       }
@@ -140,20 +293,49 @@
       boost -= dx * dragMultiplier;
     }
 
-    function onUp() {
-      dragging = false;
-      clearTimeout(holdTimer);
-      holdPaused = false;
+    function onUp(e) {
+      if (dragging) {
+        dragging = false;
+        clearTimeout(holdTimer);
+        holdPaused = false;
+
+        const dt = performance.now() - downTime;
+        // Treat as a click if the pointer barely moved and was quick
+        if (!moved && dt < 400) {
+          handleClick(e.clientX, e.clientY);
+        }
+      }
+    }
+
+    function handleClick(x, y) {
+      // If something is selected, clicking anywhere deselects
+      if (selectedIndex !== -1) {
+        deselect();
+        return;
+      }
+      // Otherwise, hit-test the image under the pointer
+      // Temporarily allow pointer events to find the element
+      const els = document.elementsFromPoint(x, y);
+      const img = els.find(el => el.tagName === 'IMG' && el.dataset.index !== undefined);
+      if (img) selectSlide(img);
     }
 
     const surface = document.body;
     surface.addEventListener('pointerdown', onDown);
     surface.addEventListener('pointermove', onMove);
     surface.addEventListener('pointerup', onUp);
-    surface.addEventListener('pointercancel', onUp);
-    surface.addEventListener('pointerleave', onUp);
+    surface.addEventListener('pointercancel', () => { dragging = false; clearTimeout(holdTimer); holdPaused = false; });
     surface.addEventListener('contextmenu', e => e.preventDefault());
     surface.addEventListener('dragstart', e => e.preventDefault());
+
+    // Need pointer events on the track images for click detection via elementsFromPoint,
+    // but we set pointer-events: none on imgs earlier so hover doesn't fight the drag.
+    // elementsFromPoint still returns them regardless of pointer-events, so we're fine.
+
+    // Escape key to deselect
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') deselect();
+    });
   </script>
 </body>
 </html>
