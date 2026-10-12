@@ -10,7 +10,6 @@
       height: 100%;
       overflow: hidden;
       background: #000;
-      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
       user-select: none;
       -webkit-user-select: none;
       touch-action: none;
@@ -25,7 +24,7 @@
     }
 
     #track img {
-      height: 60vh;
+      height: 55vh;
       width: auto;
       flex: 0 0 auto;
       object-fit: contain;
@@ -33,166 +32,70 @@
       padding: 0;
       display: block;
       -webkit-user-drag: none;
-      transition: filter 0.6s ease, opacity 0.6s ease;
-    }
-
-    body.has-selection #track img {
-      filter: brightness(0.3) grayscale(0.5);
-      opacity: 0.4;
-    }
-    body.has-selection #track img.selected {
-      filter: brightness(1.2) saturate(0.9);
-      opacity: 1;
-    }
-
-    #overlay {
-      position: fixed;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.8s ease;
-      text-align: center;
-      padding: 0 8vw;
-      color: #f4f4f0;
-    }
-    body.has-selection #overlay { opacity: 1; }
-
-    #overlay .title {
-      font-size: clamp(28px, 5vw, 64px);
-      font-weight: 200;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      line-height: 1.15;
-      margin-bottom: 1.2em;
-    }
-    #overlay .caption {
-      font-size: clamp(12px, 1.2vw, 16px);
-      font-weight: 300;
-      letter-spacing: 0.28em;
-      text-transform: uppercase;
-      opacity: 0.75;
-      max-width: 640px;
-      line-height: 2;
-    }
-    #overlay .rule {
-      width: 40px;
-      height: 1px;
-      background: #f4f4f0;
-      opacity: 0.5;
-      margin: 1.6em 0;
-    }
-
-    #hint {
-      position: fixed;
-      bottom: 24px;
-      left: 50%;
-      transform: translateX(-50%);
-      color: #f4f4f0;
-      font-size: 11px;
-      letter-spacing: 0.3em;
-      text-transform: uppercase;
-      opacity: 0;
-      transition: opacity 0.6s ease;
       pointer-events: none;
     }
-    body.has-selection #hint { opacity: 0.45; }
   </style>
 </head>
 <body>
   <div id="track"></div>
 
-  <div id="overlay">
-    <div class="title" id="ovTitle"></div>
-    <div class="rule"></div>
-    <div class="caption" id="ovCaption"></div>
-  </div>
-
-  <div id="hint">Click anywhere to return</div>
-
   <script>
-    console.log('[slideshow] script starting');
-
     // ==== EDIT THIS LIST ====
-    const slides = [
-      { src: "images/st1.png",  title: "Form I",   caption: "Emergent structure, grown not built" },
-      { src: "images/st2.png",  title: "Form II",  caption: "Material as a record of force" },
-      { src: "images/st3.png",  title: "Form III", caption: "Between the organic and the computed" },
-      { src: "images/st4.png",  title: "Form IV",  caption: "Every boundary is a negotiation" },
-      { src: "images/st5.png",  title: "Form V",   caption: "Shape follows environment" },
-      { src: "images/st6.png",  title: "Form VI",  caption: "Growth as a design parameter" },
-      { src: "images/st7.png",  title: "Form VII", caption: "The space between things" },
-      { src: "images/st8.png",  title: "Form VIII",caption: "Structure without hierarchy" },
-      { src: "images/st9.png",  title: "Form IX",  caption: "Variation within a rule" },
-      { src: "images/st10.png", title: "Form X",   caption: "Surface as interface" },
-      { src: "images/st11.png", title: "Form XI",  caption: "Material intelligence" },
-      { src: "images/st12.png", title: "Form XII", caption: "The architecture of a moment" },
-      { src: "images/st13.png", title: "Form XIII",caption: "Bodies in dialogue" },
-      { src: "images/st14.png", title: "Form XIV", caption: "Softness as strategy" },
-      { src: "images/st15.png", title: "Form XV",  caption: "Continuous variation" },
-      { src: "images/st16.png", title: "Form XVI", caption: "Living systems, made visible" },
+    const images = [
+      "images/st1.png",
+      "images/st2.png",
+      "images/st3.png",
+      "images/st4.png",
+      "images/st5.png",
+      "images/st6.png",
+      "images/st7.png",
+      "images/st8.png",
+      "images/st9.png",
+      "images/st10.png",
+      "images/st11.png",
+      "images/st12.png",
+      "images/st13.png",
+      "images/st14.png",
+      "images/st15.png",
+      "images/st16.png",
     ];
     // ========================
 
     const baseSpeed = 0.6;
-    const dragMultiplier = 0.25;
-    const friction = 0.95;
+    const friction = 0.94;
 
     const track = document.getElementById('track');
-    const ovTitle = document.getElementById('ovTitle');
-    const ovCaption = document.getElementById('ovCaption');
 
-    let selectedIndex = -1;
-    let selectedEl = null;
-
+    // Build the track (two copies for seamless looping)
     const buildImages = () => {
       track.innerHTML = '';
       for (let copy = 0; copy < 2; copy++) {
-        slides.forEach((slide, i) => {
+        images.forEach(src => {
           const img = document.createElement('img');
-          img.src = slide.src;
+          img.src = src;
           img.alt = '';
-          img.dataset.index = i;
-          img.dataset.copy = copy;
           track.appendChild(img);
         });
       }
-      console.log('[slideshow] built', track.children.length, 'image elements');
     };
     buildImages();
 
-    // Attach click handler to every image
-    function attachClickHandlers() {
-      Array.from(track.children).forEach(img => {
-        img.addEventListener('click', (e) => {
-          console.log('[slideshow] img clicked, index =', img.dataset.index);
-          e.stopPropagation();
-          if (selectedIndex === -1) {
-            selectSlide(img);
-          }
-        });
-      });
-    }
-    attachClickHandlers();
-
     let offset = 0;
-    let boost = 0;
+    let velocity = 0;
     let dragging = false;
     let lastX = 0;
-    let holdPaused = false;
-    let holdTimer = null;
+    let lastMoveTime = 0;
+    let paused = false;
+    let moved = false;
+    let downX = 0, downY = 0, downTime = 0;
     let singleWidth = 0;
 
     function measure() {
       const kids = track.children;
       singleWidth = 0;
-      for (let i = 0; i < slides.length; i++) {
+      for (let i = 0; i < images.length; i++) {
         singleWidth += kids[i].getBoundingClientRect().width;
       }
-      console.log('[slideshow] measured singleWidth =', singleWidth);
     }
 
     window.addEventListener('load', () => {
@@ -202,11 +105,14 @@
     window.addEventListener('resize', measure);
 
     function tick() {
-      if (!holdPaused && selectedIndex === -1 && !dragging) {
-        const speed = baseSpeed + boost;
-        offset -= speed;
-        boost *= friction;
-        if (Math.abs(boost) < 0.01) boost = 0;
+      if (dragging) {
+        // offset is updated directly in pointermove
+      } else if (paused) {
+        velocity = 0;
+      } else {
+        offset -= (baseSpeed + velocity);
+        velocity *= friction;
+        if (Math.abs(velocity) < 0.01) velocity = 0;
       }
 
       if (singleWidth > 0) {
@@ -218,105 +124,62 @@
       requestAnimationFrame(tick);
     }
 
-    function selectSlide(imgEl) {
-      console.log('[slideshow] selectSlide called');
-      if (selectedEl) selectedEl.classList.remove('selected');
-      selectedEl = imgEl;
-      selectedEl.classList.add('selected');
-
-      const i = parseInt(imgEl.dataset.index, 10);
-      selectedIndex = i;
-
-      ovTitle.textContent = slides[i].title;
-      ovCaption.textContent = slides[i].caption;
-
-      centerOn(imgEl);
-      document.body.classList.add('has-selection');
-    }
-
-    function deselect() {
-      console.log('[slideshow] deselect called');
-      if (selectedEl) selectedEl.classList.remove('selected');
-      selectedEl = null;
-      selectedIndex = -1;
-      document.body.classList.remove('has-selection');
-    }
-
-    function centerOn(imgEl) {
-      const rect = imgEl.getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      const viewportCenter = window.innerWidth / 2;
-      const delta = viewportCenter - centerX;
-      const start = offset;
-      const end = offset + delta;
-      const startTime = performance.now();
-      const duration = 700;
-      function step(now) {
-        const t = Math.min(1, (now - startTime) / duration);
-        const eased = 1 - Math.pow(1 - t, 3);
-        offset = start + (end - start) * eased;
-        if (t < 1) requestAnimationFrame(step);
-      }
-      requestAnimationFrame(step);
-    }
-
-    // ==== Drag handling (separate from clicks) ====
-    let downX = 0, downY = 0, downTime = 0, moved = false;
-
     document.addEventListener('pointerdown', (e) => {
-      if (selectedIndex !== -1) return;
       dragging = true;
       moved = false;
-      lastX = e.clientX;
       downX = e.clientX;
       downY = e.clientY;
       downTime = performance.now();
-
-      clearTimeout(holdTimer);
-      holdTimer = setTimeout(() => {
-        if (dragging && !moved) holdPaused = true;
-      }, 250);
+      lastX = e.clientX;
+      lastMoveTime = performance.now();
+      velocity = 0;
     });
 
     document.addEventListener('pointermove', (e) => {
-      if (!dragging || selectedIndex !== -1) return;
+      if (!dragging) return;
+
       const dx = e.clientX - lastX;
-      lastX = e.clientX;
+      const now = performance.now();
+      const dt = Math.max(1, now - lastMoveTime);
 
       if (Math.abs(e.clientX - downX) > 6 || Math.abs(e.clientY - downY) > 6) {
         moved = true;
-        clearTimeout(holdTimer);
-        holdPaused = false;
       }
 
-      boost -= dx * dragMultiplier;
+      if (moved) {
+        // If we were paused and the user drags, resume motion on release
+        paused = false;
+
+        offset += dx;
+        velocity = -dx / dt * 16;
+        lastX = e.clientX;
+        lastMoveTime = now;
+      }
     });
 
     document.addEventListener('pointerup', (e) => {
-      if (selectedIndex !== -1) {
-        // If nothing is selected and it was a quick tap, deselect
-        const dt = performance.now() - downTime;
-        if (dt < 400 && Math.abs(e.clientX - downX) < 6 && Math.abs(e.clientY - downY) < 6) {
-          deselect();
-        }
-        return;
-      }
+      const dt = performance.now() - downTime;
+      const quick = dt < 400;
+      const still = Math.abs(e.clientX - downX) < 6 && Math.abs(e.clientY - downY) < 6;
+
       dragging = false;
-      clearTimeout(holdTimer);
-      holdPaused = false;
+
+      if (quick && still) {
+        // Tap = toggle pause
+        paused = !paused;
+        velocity = 0;
+      } else if (moved) {
+        // Was a drag — leave paused as false so momentum carries
+        paused = false;
+      }
     });
 
     document.addEventListener('pointercancel', () => {
       dragging = false;
-      clearTimeout(holdTimer);
-      holdPaused = false;
     });
 
     document.addEventListener('contextmenu', e => e.preventDefault());
     document.addEventListener('dragstart', e => e.preventDefault());
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') deselect(); });
-
-    console.log('[slideshow] setup complete');
   </script>
 </body>
 </html>
