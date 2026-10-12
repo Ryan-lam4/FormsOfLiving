@@ -20,7 +20,6 @@
       max-width: 100vw;
       max-height: 100vh;
       object-fit: contain;
-      transition: opacity 0.5s ease;
     }
     .controls {
       position: fixed;
@@ -55,14 +54,12 @@
   <img id="slideshow" src="" alt="Slideshow">
   <div class="controls">
     <button id="prev">‹</button>
-    <button id="playPause">⏸</button>
     <button id="next">›</button>
     <span id="counter"></span>
   </div>
 
   <script>
     // ==== EDIT THIS LIST ====
-    // Add the paths to your images here
     const images = [
       "images/s1.png",
       "images/s2.png",
@@ -71,56 +68,37 @@
     ];
     // ========================
 
-    const intervalMs = 3000; // time between slides in ms
-
     const imgEl = document.getElementById('slideshow');
     const counterEl = document.getElementById('counter');
-    const playPauseBtn = document.getElementById('playPause');
 
     let index = 0;
-    let playing = true;
-    let timer = null;
 
     function show(i) {
       index = (i + images.length) % images.length;
-      imgEl.style.opacity = 0;
-      setTimeout(() => {
-        imgEl.src = images[index];
-        imgEl.style.opacity = 1;
-      }, 150);
+      imgEl.src = images[index];
       counterEl.textContent = `${index + 1} / ${images.length}`;
     }
 
     function next() { show(index + 1); }
     function prev() { show(index - 1); }
 
-    function startTimer() {
-      stopTimer();
-      timer = setInterval(next, intervalMs);
-    }
-    function stopTimer() {
-      if (timer) clearInterval(timer);
-      timer = null;
-    }
-
-    playPauseBtn.onclick = () => {
-      playing = !playing;
-      playPauseBtn.textContent = playing ? '⏸' : '▶';
-      playing ? startTimer() : stopTimer();
-    };
-    document.getElementById('next').onclick = () => { next(); if (playing) startTimer(); };
-    document.getElementById('prev').onclick = () => { prev(); if (playing) startTimer(); };
+    document.getElementById('next').onclick = next;
+    document.getElementById('prev').onclick = prev;
 
     // Keyboard controls
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowRight') { next(); if (playing) startTimer(); }
-      if (e.key === 'ArrowLeft')  { prev(); if (playing) startTimer(); }
-      if (e.key === ' ') { e.preventDefault(); playPauseBtn.click(); }
+      if (e.key === 'ArrowRight') next();
+      if (e.key === 'ArrowLeft')  prev();
+    });
+
+    // Preload all images so switching is instant
+    images.forEach(src => {
+      const img = new Image();
+      img.src = src;
     });
 
     // Init
     show(0);
-    if (images.length > 1) startTimer();
   </script>
 </body>
 </html>
