@@ -9,7 +9,7 @@
     html, body {
       height: 100%;
       overflow: hidden;
-      background: #111;
+      background: #000;
       font-family: system-ui, sans-serif;
       user-select: none;
       -webkit-user-select: none;
@@ -23,13 +23,15 @@
       will-change: transform;
     }
     #track img {
-      height: 100vh;
+      height: 60vh;      /* controls how tall the images are in the void */
       width: auto;
       flex: 0 0 auto;
       object-fit: contain;
-      padding: 0 8px;
+      padding: 0;        /* no gap between images */
+      margin: 0;
       pointer-events: none;
       -webkit-user-drag: none;
+      display: block;
     }
   </style>
 </head>
@@ -58,13 +60,12 @@
     ];
     // ========================
 
-    const baseSpeed = 0.6;        // pixels per frame at 60fps (~36 px/s)
-    const dragMultiplier = 0.25;  // how much a drag adds to speed
-    const friction = 0.95;        // how fast the drag boost decays
+    const baseSpeed = 0.6;
+    const dragMultiplier = 0.25;
+    const friction = 0.95;
 
     const track = document.getElementById('track');
 
-    // Build two copies of the list for seamless looping
     const buildImages = () => {
       track.innerHTML = '';
       for (let copy = 0; copy < 2; copy++) {
@@ -78,16 +79,15 @@
     };
     buildImages();
 
-    let offset = 0;         // current translateX
-    let boost = 0;          // extra speed from drags
+    let offset = 0;
+    let boost = 0;
     let dragging = false;
     let lastX = 0;
     let holdPaused = false;
     let holdTimer = null;
-    let singleWidth = 0;    // width of one full set of images
+    let singleWidth = 0;
 
     function measure() {
-      // Sum the widths of the first set of images
       const kids = track.children;
       singleWidth = 0;
       for (let i = 0; i < images.length; i++) {
@@ -109,7 +109,6 @@
         if (Math.abs(boost) < 0.01) boost = 0;
       }
 
-      // Wrap: when we've scrolled past one full set, snap back
       if (singleWidth > 0) {
         if (offset <= -singleWidth) offset += singleWidth;
         if (offset > 0) offset -= singleWidth;
@@ -119,17 +118,12 @@
       requestAnimationFrame(tick);
     }
 
-    // ==== Pointer / touch handling ====
     function onDown(e) {
       dragging = true;
       lastX = e.clientX;
-
-      // Start a timer: if they hold ~250ms without moving, pause
       clearTimeout(holdTimer);
       holdTimer = setTimeout(() => {
-        if (dragging && Math.abs(0) < 5) {
-          holdPaused = true;
-        }
+        if (dragging) holdPaused = true;
       }, 250);
     }
 
@@ -138,13 +132,11 @@
       const dx = e.clientX - lastX;
       lastX = e.clientX;
 
-      // If they move more than a few px, cancel the hold-pause
       if (Math.abs(dx) > 3) {
         clearTimeout(holdTimer);
         holdPaused = false;
       }
 
-      // Dragging adds momentum to the scroll
       boost -= dx * dragMultiplier;
     }
 
@@ -160,12 +152,8 @@
     surface.addEventListener('pointerup', onUp);
     surface.addEventListener('pointercancel', onUp);
     surface.addEventListener('pointerleave', onUp);
-
-    // Prevent context menu / text selection weirdness during drags
     surface.addEventListener('contextmenu', e => e.preventDefault());
     surface.addEventListener('dragstart', e => e.preventDefault());
-
-    // Preload handled naturally since all imgs are in the DOM
   </script>
 </body>
 </html>
