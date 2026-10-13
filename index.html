@@ -61,12 +61,31 @@
     ];
     // ========================
 
+    // ==== AUDIO ====
+    const audio = new Audio('images/construction.mp3');
+    audio.loop = true;
+    audio.preload = 'auto';
+
+    let audioStarted = false;
+
+    function tryStartAudio() {
+      if (audioStarted) return;
+      const p = audio.play();
+      if (p && typeof p.then === 'function') {
+        p.then(() => { audioStarted = true; })
+         .catch(() => { /* will retry on next tap */ });
+      } else {
+        audioStarted = true;
+      }
+    }
+    tryStartAudio();
+    // ================
+
     const baseSpeed = 0.6;
     const friction = 0.94;
 
     const track = document.getElementById('track');
 
-    // Build the track (two copies for seamless looping)
     const buildImages = () => {
       track.innerHTML = '';
       for (let copy = 0; copy < 2; copy++) {
@@ -147,9 +166,7 @@
       }
 
       if (moved) {
-        // If we were paused and the user drags, resume motion on release
         paused = false;
-
         offset += dx;
         velocity = -dx / dt * 16;
         lastX = e.clientX;
@@ -165,11 +182,18 @@
       dragging = false;
 
       if (quick && still) {
-        // Tap = toggle pause
-        paused = !paused;
-        velocity = 0;
+        if (!audioStarted) {
+          // First tap: start audio, don't toggle pause
+          tryStartAudio();
+          paused = false;
+          velocity = 0;
+        } else {
+          paused = !paused;
+          velocity = 0;
+          if (paused) audio.pause();
+          else audio.play().catch(() => {});
+        }
       } else if (moved) {
-        // Was a drag — leave paused as false so momentum carries
         paused = false;
       }
     });
